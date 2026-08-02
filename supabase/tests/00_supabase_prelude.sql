@@ -1,8 +1,19 @@
 -- Supabase が用意する前提を素の PostgreSQL 上に再現し、
 -- BRIDGE のマイグレーションを検証できるようにする。
-create role anon nologin;
-create role authenticated nologin;
-create role service_role nologin;
+-- ロールはデータベース単位ではなくクラスタ単位で存在するため、
+-- 同じサーバーで複数回実行しても失敗しないようにする。
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'anon') then
+    create role anon nologin;
+  end if;
+  if not exists (select 1 from pg_roles where rolname = 'authenticated') then
+    create role authenticated nologin;
+  end if;
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then
+    create role service_role nologin;
+  end if;
+end $$;
 
 grant usage on schema public to anon, authenticated, service_role;
 alter default privileges in schema public

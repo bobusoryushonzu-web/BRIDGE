@@ -4,6 +4,7 @@
 
 | ドキュメント | 内容 |
 |---|---|
+| **[docs/SETUP.md](docs/SETUP.md)** | **セットアップ手順(まずこれ。ブラウザだけで30〜40分)** |
 | [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | 要件定義(機能一覧・データ設計・非機能要件) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 技術構成と設計判断 |
 
@@ -23,6 +24,10 @@ supabase/
 使用サービスは **GitHub / Supabase / Vercel の3つのみ**。いずれも無料枠で開始できる。
 
 ## セットアップ
+
+**→ ブラウザだけで完結する手順は [docs/SETUP.md](docs/SETUP.md) にある。通常はそちらを使う。**
+
+以下は各手順の要約と、コマンドで行う場合の記載。
 
 ### 1. Supabase プロジェクトを作る
 
