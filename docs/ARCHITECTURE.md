@@ -35,35 +35,56 @@
 
 | 領域 | 採用技術 | 理由 |
 |---|---|---|
-| フロントエンド | Next.js (React) + TypeScript | 2アプリを同じ技術で統一。型を共有できる |
+| フロントエンド | Vite + React + TypeScript | 静的SPAとして配信。2アプリを同じ技術で統一し型を共有できる |
+| ルーティング | React Router | 画面遷移の管理 |
 | スタイリング | Tailwind CSS | スマホ最適化UIを素早く構築 |
 | バックエンド | Supabase (PostgreSQL / Auth / Realtime / Storage / Edge Functions) | サーバー運用不要でリアルタイム性を確保 |
 | リポジトリ | GitHub (モノレポ) | 2アプリ+DB定義を1リポジトリで管理 |
 | CI/CD | GitHub Actions + Vercel | push で自動テスト・自動デプロイ |
-| ホスティング | Vercel (customer / staff を別プロジェクトとしてデプロイ) | Next.js と相性が良く無料枠で開始可能 |
+| ホスティング | Vercel (customer / staff を別プロジェクトとしてデプロイ) | GitHub 連携で自動デプロイ。※Hobby プランは非商用限定のため、実店舗の営業で使う段階では Pro への切り替えが必要 |
+
+### 技術選定の判断: なぜ Next.js ではないか
+
+当初 Next.js を候補としたが、以下の理由で Vite + React を採用した。
+
+Supabase のクライアント SDK がブラウザから認証・データ取得・リアルタイム購読をすべて処理するため、**サーバーを経由する処理が存在しない**。加えて本システムは QR とログインの向こう側にある業務アプリであり、SEO も不要。その結果 Next.js の主要機能(Server Components / SSR、API Routes、Middleware、ISR、`next/image` 最適化)がいずれも使われず、残るのはルーティングとビルドのみとなる。
+
+Vite なら同じことをより軽量に実現でき、開発サーバーの起動とホットリロードが高速で、Server / Client Component の使い分けを考える必要もない。出力は純粋な静的ファイルのため、ホスティング先の制約も受けない。
+
+将来 SSR や SEO が必要になった場合(例: 店の公開メニューページを検索に載せる)は、そのページのみ別途対応する。
 
 ## 3. リポジトリ構成(モノレポ)
 
 ```
 BRIDGE/
 ├── apps/
-│   ├── customer/                # 客用アプリ (Next.js)
+│   ├── customer/                # 客用アプリ (Vite + React)
+│   │   ├── index.html
+│   │   ├── vite.config.ts
 │   │   └── src/
-│   │       ├── app/
-│   │       │   ├── t/[qrToken]/         # QR入店 → セッション開始
-│   │       │   ├── menu/                # メニュー閲覧・カート
-│   │       │   ├── orders/              # 注文履歴・ステータス確認
-│   │       │   └── checkout/            # 会計依頼
-│   │       └── components/
-│   └── staff/                   # 店員用アプリ (Next.js)
+│   │       ├── main.tsx
+│   │       ├── App.tsx                  # ルーティング定義
+│   │       ├── routes/
+│   │       │   ├── Entry.tsx            # /t/:qrToken  QR入店 → セッション開始
+│   │       │   ├── Menu.tsx             # /menu        メニュー閲覧・カート
+│   │       │   ├── Orders.tsx           # /orders      注文履歴・ステータス確認
+│   │       │   └── Checkout.tsx         # /checkout    会計依頼
+│   │       ├── components/
+│   │       └── lib/                     # Supabaseクライアント・カート状態
+│   └── staff/                   # 店員用アプリ (Vite + React)
+│       ├── index.html
+│       ├── vite.config.ts
 │       └── src/
-│           ├── app/
-│           │   ├── login/               # 店員ログイン
-│           │   ├── dashboard/           # 注文・呼び出し一覧(リアルタイム)
-│           │   ├── tables/              # テーブル・QR管理
-│           │   ├── menu/                # 商品・カテゴリ管理(CRUD)
-│           │   └── checkout/            # 会計処理
-│           └── components/
+│           ├── main.tsx
+│           ├── App.tsx
+│           ├── routes/
+│           │   ├── Login.tsx            # 店員ログイン
+│           │   ├── Dashboard.tsx        # 注文・呼び出し一覧(リアルタイム)
+│           │   ├── Tables.tsx           # テーブル・QR管理
+│           │   ├── MenuAdmin.tsx        # 商品・カテゴリ管理(CRUD)
+│           │   └── Checkout.tsx         # 会計処理
+│           ├── components/
+│           └── lib/
 ├── packages/
 │   └── shared/                  # 共有パッケージ
 │       ├── types/               # DBから生成した型定義 (supabase gen types)
@@ -166,8 +187,9 @@ staff_profiles (店員: Supabase Auth ユーザーに紐付く)
 
 ## 7. 環境・デプロイ
 
-- **環境変数**: `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を Vercel の各プロジェクトに設定。`service_role` キーは Edge Functions / GitHub Actions Secrets のみに置き、フロントには絶対に出さない。
-- **デプロイ**: `apps/customer` と `apps/staff` を Vercel の別プロジェクトとして接続し、`main` への push で自動デプロイ。
+- **環境変数**: `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` を Vercel の各プロジェクトに設定(Vite ではビルド時に `VITE_` 接頭辞の変数のみクライアントへ埋め込まれる)。`anon` キーはブラウザに露出する前提の設計で、保護は RLS が担う。`service_role` キーと DB パスワードは Edge Functions / GitHub Actions Secrets のみに置き、フロントには絶対に出さない。
+- **デプロイ**: `apps/customer` と `apps/staff` を Vercel の別プロジェクトとして接続(Root Directory にそれぞれのパスを指定)し、`main` への push で自動デプロイ。ビルド成果物は静的ファイルのみ。
+- **SPA のルーティング対応**: 静的配信では `/menu` などへの直接アクセスが 404 になるため、全経路を `index.html` にフォールバックさせる設定を各アプリに置く。
 - **DB マイグレーション**: ローカルで `supabase migration new` → PR レビュー → `main` マージ時に GitHub Actions が `supabase db push`。
 - **開発環境**: `supabase start`(ローカル Docker)で本番に影響なく開発。
 
