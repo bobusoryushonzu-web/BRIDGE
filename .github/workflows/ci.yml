@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    name: 型検査とビルド
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 依存関係をインストール
+        run: npm ci
+
+      - name: 型検査
+        run: npm run typecheck
+
+      - name: ビルド
+        # 実際の値はデプロイ時に Vercel が渡す。ここは形式確認のためのダミー。
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: dummy-key-for-ci
+        run: npm run build
+
+  database:
+    name: データベースの検証
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: マイグレーションを適用し RLS を検証
+        env:
+          PGPASSWORD: postgres
+        run: |
+          export PSQL="psql -h localhost -U postgres -v ON_ERROR_STOP=1 -q"
+          $PSQL -c 'create database bridge_test'
+          export PSQL="$PSQL -d bridge_test"
+          # Supabase が用意する前提(ロール・auth スキーマ)を再現する
+          $PSQL -f supabase/tests/00_supabase_prelude.sql
+          for file in supabase/migrations/*.sql; do
+            echo "適用: $file"
+            $PSQL -f "$file"
+          done
+          $PSQL -f supabase/seed.sql
+          # 期待どおりなら全項目 PASS になる
+          $PSQL -f supabase/tests/01_rls_and_integrity.sql | tee /tmp/result.txt
+          if grep -q 'FAIL' /tmp/result.txt; then
+            echo '検証に失敗した項目があります'
+            exit 1
+          fi

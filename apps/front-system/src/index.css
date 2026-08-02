@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-stone-100 text-stone-900 antialiased;
+  /* iOS でのプルバウンドによる誤操作を抑える */
+  overscroll-behavior-y: none;
+}
+
+/* 端末のセーフエリア(iPhone のホームバー等)を避ける */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
