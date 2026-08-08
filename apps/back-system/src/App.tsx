@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
-import { Spinner } from './components/ui';
+import { Button, Spinner } from './components/ui';
 import Login from './routes/Login';
 import Dashboard from './routes/Dashboard';
 import Serving from './routes/Serving';
@@ -71,12 +72,19 @@ function Shell() {
 
 /** ログイン済みかつ staff_users に登録されている場合のみ通す */
 function RequireStaff() {
-  const { loading, session, staff } = useAuth();
+  const { loading, session, staff, signOut, recheckStaff } = useAuth();
+  const [checking, setChecking] = useState(false);
 
   if (loading) return <Spinner label="確認しています" />;
   if (!session) return <Navigate to="/login" replace />;
 
   if (!staff) {
+    const handleRecheck = async () => {
+      setChecking(true);
+      await recheckStaff();
+      setChecking(false);
+    };
+
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <p className="text-4xl">🔒</p>
@@ -86,6 +94,17 @@ function RequireStaff() {
           <br />
           管理者に staff_users への登録を依頼してください。
         </p>
+        <p className="mt-2 text-xs text-stone-400">
+          登録が完了した後にこの画面が出ている場合は、下のボタンで再確認できます。
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <Button tone="primary" onClick={() => void handleRecheck()} disabled={checking}>
+            {checking ? '確認しています…' : 'もう一度確認する'}
+          </Button>
+          <Button tone="neutral" onClick={() => void signOut()}>
+            ログアウト
+          </Button>
+        </div>
       </div>
     );
   }

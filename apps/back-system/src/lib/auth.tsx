@@ -22,9 +22,24 @@ interface AuthContextValue {
   staff: StaffUser | null;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /**
+   * staff_users の登録状況を再確認する。
+   * 管理者がログイン後に staff_users へ登録した場合、開きっぱなしのタブは
+   * それを知らないため、手動で再チェックできるようにする。
+   */
+  recheckStaff: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+async function fetchStaff(userId: string): Promise<StaffUser | null> {
+  const { data } = await supabase
+    .from('staff_users')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  return (data as StaffUser | null) ?? null;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -39,12 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (active) setStaff(null);
         return;
       }
-      const { data } = await supabase
-        .from('staff_users')
-        .select('*')
-        .eq('id', current.user.id)
-        .maybeSingle();
-      if (active) setStaff((data as StaffUser | null) ?? null);
+      const next = await fetchStaff(current.user.id);
+      if (active) setStaff(next);
     }
 
     void supabase.auth.getSession().then(async ({ data }) => {
@@ -78,6 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       signOut: async () => {
         await supabase.auth.signOut();
+      },
+      recheckStaff: async () => {
+        if (!session) return;
+        setStaff(await fetchStaff(session.user.id));
       },
     }),
     [loading, session, staff],
