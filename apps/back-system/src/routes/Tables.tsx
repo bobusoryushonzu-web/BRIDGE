@@ -32,6 +32,7 @@ export default function Tables() {
   const [error, setError] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState('');
   const [saving, setSaving] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const [baseUrl, setBaseUrl] = useState(
     () => localStorage.getItem(STORAGE_KEY) ?? '',
@@ -83,6 +84,16 @@ export default function Tables() {
   };
 
   const urlFor = (table: TableRow) => `${baseUrl}/t/${table.qr_token}`;
+
+  const copyUrl = async (table: TableRow) => {
+    try {
+      await navigator.clipboard.writeText(urlFor(table));
+      setCopiedId(table.id);
+      window.setTimeout(() => setCopiedId((current) => (current === table.id ? null : current)), 1500);
+    } catch {
+      // クリップボードが使えない環境では、下のテキスト欄から手動で選択・コピーしてもらう
+    }
+  };
 
   if (loading) return <Spinner />;
 
@@ -181,6 +192,31 @@ export default function Tables() {
             <p className="mt-3 text-sm font-medium print:block hidden">
               メニューはこちら
             </p>
+
+            {/* QRを印刷する前でも、この URL を直接ブラウザで開けばテストできる */}
+            {baseUrl && (
+              <div className="mt-4 print:hidden">
+                <input
+                  readOnly
+                  value={urlFor(table)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="w-full truncate rounded-lg border border-stone-200 bg-stone-50 px-2 py-1.5 text-center text-xs text-stone-600"
+                />
+                <div className="mt-2 flex justify-center gap-2">
+                  <Button size="sm" tone="neutral" onClick={() => void copyUrl(table)}>
+                    {copiedId === table.id ? 'コピーしました' : 'URLをコピー'}
+                  </Button>
+                  <a
+                    href={urlFor(table)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-xl bg-stone-100 px-3 py-1.5 text-sm font-bold text-stone-700 hover:bg-stone-200"
+                  >
+                    このURLを開く
+                  </a>
+                </div>
+              </div>
+            )}
 
             <div className="mt-4 print:hidden">
               <Button
