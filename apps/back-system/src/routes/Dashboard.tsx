@@ -6,8 +6,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  CALL_TYPE_ICON,
   CALL_TYPE_LABEL,
+  CALL_TYPE_TONE,
   SERVE_TIMING_LABEL,
   formatElapsed,
   formatTime,
@@ -147,9 +147,10 @@ export default function Dashboard() {
                           番テーブル
                         </span>
                       </p>
-                      <p className="mt-1 flex items-center gap-1.5 font-bold">
-                        <span aria-hidden>{CALL_TYPE_ICON[call.type]}</span>
-                        {CALL_TYPE_LABEL[call.type]}
+                      <p className="mt-1">
+                        <Badge tone={CALL_TYPE_TONE[call.type]}>
+                          {CALL_TYPE_LABEL[call.type]}
+                        </Badge>
                       </p>
                     </div>
                     <Badge tone={urgent ? 'red' : 'neutral'}>
@@ -188,7 +189,7 @@ export default function Dashboard() {
         <h2 className="mb-3 text-lg font-bold">新着のご注文</h2>
 
         {orders.length === 0 ? (
-          <EmptyState icon="🍽️" message="まだご注文はありません" />
+          <EmptyState message="まだご注文はありません" />
         ) : (
           <ul className="space-y-3">
             {orders.map((order) => {

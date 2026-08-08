@@ -42,7 +42,7 @@ export default function Bill() {
     return (
       <>
         <Header title="お会計" tableNumber={tableNumber} />
-        <EmptyState icon="🧾" message="お会計の対象となるご注文がありません" />
+        <EmptyState message="お会計の対象となるご注文がありません" />
       </>
     );
   }
@@ -98,8 +98,7 @@ export default function Bill() {
         <div className="mt-5">
           {requested ? (
             <div className="rounded-2xl bg-emerald-50 p-5 text-center ring-1 ring-emerald-200">
-              <p className="text-2xl">✅</p>
-              <p className="mt-2 font-bold text-emerald-900">
+              <p className="font-bold text-emerald-900">
                 お会計をお伝えしました
               </p>
               <p className="mt-1 text-sm text-emerald-800">

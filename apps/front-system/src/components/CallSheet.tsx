@@ -53,7 +53,6 @@ export function CallSheet({ open, onClose, onCall, hasPendingAfterItems }: Props
             onClick={() => handle('bell')}
             className="flex w-full items-center gap-4 rounded-2xl border border-stone-200 bg-stone-50 p-4 text-left active:bg-stone-100 disabled:opacity-50"
           >
-            <span className="text-2xl">🔔</span>
             <span className="flex-1">
               <span className="block font-bold">店員を呼ぶ</span>
               <span className="block text-sm text-stone-500">
@@ -70,7 +69,6 @@ export function CallSheet({ open, onClose, onCall, hasPendingAfterItems }: Props
               onClick={() => handle('serve_after')}
               className="flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left active:bg-amber-100 disabled:opacity-50"
             >
-              <span className="text-2xl">🍰</span>
               <span className="flex-1">
                 <span className="block font-bold">食後の商品をお願いする</span>
                 <span className="block text-sm text-stone-600">

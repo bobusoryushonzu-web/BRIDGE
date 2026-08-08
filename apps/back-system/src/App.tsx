@@ -10,11 +10,11 @@ import MenuAdmin from './routes/MenuAdmin';
 import Tables from './routes/Tables';
 
 const NAV = [
-  { to: '/', label: 'ダッシュボード', icon: '🔔', end: true },
-  { to: '/serving', label: '提供状況', icon: '🍳', end: false },
-  { to: '/orders', label: '注文照会・会計', icon: '🧾', end: false },
-  { to: '/menu', label: '商品管理', icon: '📖', end: false },
-  { to: '/tables', label: '席・QR管理', icon: '🪑', end: false },
+  { to: '/', label: 'ダッシュボード', end: true },
+  { to: '/serving', label: '提供状況', end: false },
+  { to: '/orders', label: '注文照会・会計', end: false },
+  { to: '/menu', label: '商品管理', end: false },
+  { to: '/tables', label: '席・QR管理', end: false },
 ];
 
 function Shell() {
@@ -48,14 +48,13 @@ function Shell() {
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold transition ${
+                  `shrink-0 rounded-lg px-3 py-2 text-sm font-bold transition ${
                     isActive
                       ? 'bg-stone-800 text-white'
                       : 'text-stone-600 hover:bg-stone-100'
                   }`
                 }
               >
-                <span aria-hidden>{item.icon}</span>
                 {item.label}
               </NavLink>
             ))}
@@ -87,8 +86,7 @@ function RequireStaff() {
 
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
-        <p className="text-4xl">🔒</p>
-        <h1 className="mt-4 text-xl font-bold">利用権限がありません</h1>
+        <h1 className="text-xl font-bold">利用権限がありません</h1>
         <p className="mt-3 text-sm leading-relaxed text-stone-600">
           このアカウントは店員として登録されていません。
           <br />

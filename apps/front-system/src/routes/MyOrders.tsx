@@ -15,12 +15,14 @@ function LineRow({ line }: { line: BillLine }) {
   return (
     <li className="flex items-center gap-3 py-3">
       <span
-        className={`grid size-8 shrink-0 place-items-center rounded-full text-sm ${
-          served ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-400'
+        className={`grid size-8 shrink-0 place-items-center rounded-full ${
+          served ? 'bg-emerald-100' : 'bg-stone-100'
         }`}
         aria-hidden
       >
-        {served ? '✓' : '…'}
+        <span
+          className={`size-2.5 rounded-full ${served ? 'bg-emerald-600' : 'bg-stone-300'}`}
+        />
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-medium">
@@ -79,7 +81,6 @@ export default function MyOrders() {
 
       {bill.lines.length === 0 ? (
         <EmptyState
-          icon="🍽️"
           message="まだご注文はありません。メニューからお選びください"
         />
       ) : (

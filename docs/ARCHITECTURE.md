@@ -187,6 +187,10 @@ staff_users (店員: Supabase Auth ユーザーに紐付く)
 | **Phase 5: 呼び出しと会計** | 呼び鈴 / 食後提供の合図 / 会計依頼 / デジタル伝票 / 会計完了とセッションクローズ | FR-06〜09, BK-09〜12 |
 | **Phase 6: 運用対応** | セッション自動クローズ(OP-01)/ 通知音・未対応の強調表示 / PWA 化 | OP-01 |
 
+### UI デザイン方針
+
+**絵文字は使用しない。** アイコンとして使うと安っぽく見えるため、状態の見分けは色分けされたバッジ(`Badge` コンポーネント)や太字・見出しなどの typography で行う。呼び出し種別の色分けは `packages/shared/src/labels.ts` の `CALL_TYPE_TONE` に定義している。
+
 ## 7. 環境・デプロイ
 
 - **環境変数**: `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` を Vercel の各プロジェクトに設定(Vite ではビルド時に `VITE_` 接頭辞の変数のみクライアントへ埋め込まれる)。`anon` キーはブラウザに露出する前提の設計で、保護は RLS が担う。`service_role` キーと DB パスワードは Edge Functions / GitHub Actions Secrets のみに置き、フロントには絶対に出さない。

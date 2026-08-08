@@ -19,8 +19,7 @@ export function ErrorView({
 }) {
   return (
     <div className="mx-4 my-8 rounded-2xl bg-white p-6 text-center shadow-sm">
-      <p className="text-2xl">😢</p>
-      <p className="mt-3 text-stone-700">{message}</p>
+      <p className="text-stone-700">{message}</p>
       {onRetry && (
         <button
           type="button"
@@ -95,11 +94,10 @@ export function Toast({ message }: { message: string }) {
   );
 }
 
-export function EmptyState({ icon, message }: { icon: string; message: string }) {
+export function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-20 text-center text-stone-500">
-      <p className="text-4xl">{icon}</p>
-      <p className="mt-4 text-sm">{message}</p>
+    <div className="rounded-2xl border border-dashed border-stone-300 py-20 text-center text-sm text-stone-500">
+      {message}
     </div>
   );
 }

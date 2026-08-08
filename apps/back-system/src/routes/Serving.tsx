@@ -141,7 +141,6 @@ export default function Serving() {
         {/* 食中・未提供 = 今すぐ出すもの */}
         <section>
           <h2 className="mb-3 flex items-center gap-2 text-lg font-bold">
-            <span aria-hidden>🍳</span>
             今お出しするもの
             {during.length > 0 && (
               <span className="rounded-full bg-stone-800 px-2.5 py-0.5 text-sm text-white tabular-nums">
@@ -184,7 +183,6 @@ export default function Serving() {
         {/* 食後・待機中 = 客の合図を待っているもの */}
         <section>
           <h2 className="mb-3 flex items-center gap-2 text-lg font-bold">
-            <span aria-hidden>🍰</span>
             食後にお出しするもの
           </h2>
           <p className="mb-3 text-sm text-stone-500">
@@ -221,7 +219,7 @@ export default function Serving() {
       </div>
 
       {items.length === 0 && (
-        <EmptyState icon="✅" message="すべての商品をお出ししています" />
+        <EmptyState message="すべての商品をお出ししています" />
       )}
     </>
   );

@@ -32,11 +32,11 @@ export const CALL_TYPE_LABEL: Record<CallType, string> = {
   checkout: '会計',
 };
 
-/** 呼び出し種別ごとの絵文字。店員が一覧で瞬時に見分けるため */
-export const CALL_TYPE_ICON: Record<CallType, string> = {
-  bell: '🔔',
-  serve_after: '🍰',
-  checkout: '💰',
+/** 呼び出し種別ごとの色分け。店員が一覧で瞬時に見分けるため(絵文字は使わない) */
+export const CALL_TYPE_TONE: Record<CallType, 'neutral' | 'amber' | 'emerald'> = {
+  bell: 'neutral',
+  serve_after: 'amber',
+  checkout: 'emerald',
 };
 
 export const STAFF_ROLE_LABEL: Record<StaffRole, string> = {

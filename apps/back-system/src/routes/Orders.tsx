@@ -133,7 +133,7 @@ export default function Orders() {
         {/* 席の一覧 */}
         <section>
           {sessions.length === 0 ? (
-            <EmptyState icon="🪑" message="ご利用中の席はありません" />
+            <EmptyState message="ご利用中の席はありません" />
           ) : (
             <ul className="space-y-2">
               {sessions.map((session) => {

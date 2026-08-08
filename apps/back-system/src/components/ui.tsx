@@ -105,11 +105,10 @@ export function Field({
 export const inputClass =
   'w-full rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200';
 
-export function EmptyState({ icon, message }: { icon: string; message: string }) {
+export function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-16 text-center text-stone-500">
-      <p className="text-4xl">{icon}</p>
-      <p className="mt-3 text-sm">{message}</p>
+    <div className="rounded-2xl border border-dashed border-stone-300 py-16 text-center text-sm text-stone-500">
+      {message}
     </div>
   );
 }

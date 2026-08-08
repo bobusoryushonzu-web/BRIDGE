@@ -13,8 +13,10 @@ interface Props {
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   [
-    'flex flex-1 flex-col items-center gap-1 py-2 text-xs font-medium transition',
-    isActive ? 'text-amber-700' : 'text-stone-500',
+    'flex flex-1 flex-col items-center justify-center gap-0.5 border-t-2 py-3 text-sm font-bold transition',
+    isActive
+      ? 'border-amber-600 text-amber-700'
+      : 'border-transparent text-stone-500',
   ].join(' ');
 
 export function BottomNav({ onOpenCall, hasOpenCall }: Props) {
@@ -22,29 +24,25 @@ export function BottomNav({ onOpenCall, hasOpenCall }: Props) {
     <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white">
       <div className="mx-auto flex max-w-lg items-stretch">
         <NavLink to="/menu" className={linkClass}>
-          <span className="text-xl">🍽️</span>
           メニュー
         </NavLink>
 
         <NavLink to="/orders" className={linkClass}>
-          <span className="text-xl">📋</span>
           注文内容
         </NavLink>
 
         <button
           type="button"
           onClick={onOpenCall}
-          className="relative flex flex-1 flex-col items-center gap-1 py-2 text-xs font-medium text-stone-500"
+          className="relative flex flex-1 flex-col items-center justify-center gap-0.5 border-t-2 border-transparent py-3 text-sm font-bold text-stone-500"
         >
-          <span className="text-xl">🔔</span>
           呼ぶ
           {hasOpenCall && (
-            <span className="absolute right-1/4 top-1.5 size-2.5 rounded-full bg-red-500" />
+            <span className="absolute right-1/4 top-2 size-2 rounded-full bg-red-500" />
           )}
         </button>
 
         <NavLink to="/bill" className={linkClass}>
-          <span className="text-xl">💰</span>
           お会計
         </NavLink>
       </div>
