@@ -62,7 +62,7 @@ begin
   insert into public.order_items
     (order_id, menu_item_id, item_name, unit_price, quantity, serve_timing)
   select v_order, id, name, price, 1, 'during'
-    from public.menu_items where name = 'ハンバーグステーキ';
+    from public.menu_items where name = 'ハンバーグ定食';
 
   insert into public.order_items
     (order_id, menu_item_id, item_name, unit_price, quantity, serve_timing)

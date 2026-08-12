@@ -279,6 +279,8 @@ export async function createMenuItem(input: {
   name: string;
   price: number;
   description: string;
+  /** 客が「食中/食後」を選べる商品か */
+  allows_timing_choice: boolean;
 }): Promise<void> {
   const { error } = await supabase.from('menu_items').insert(input);
   if (error) throw new Error('商品を追加できませんでした');
@@ -286,7 +288,12 @@ export async function createMenuItem(input: {
 
 export async function updateMenuItem(
   id: string,
-  patch: Partial<Pick<MenuItem, 'name' | 'price' | 'description' | 'is_available'>>,
+  patch: Partial<
+    Pick<
+      MenuItem,
+      'name' | 'price' | 'description' | 'is_available' | 'allows_timing_choice'
+    >
+  >,
 ): Promise<void> {
   const { error } = await supabase.from('menu_items').update(patch).eq('id', id);
   if (error) throw new Error('商品を更新できませんでした');
@@ -306,7 +313,6 @@ export async function deleteMenuItem(id: string): Promise<void> {
 
 export async function createCategory(input: {
   name: string;
-  allows_timing_choice: boolean;
   sort_order: number;
 }): Promise<void> {
   const { error } = await supabase.from('categories').insert(input);

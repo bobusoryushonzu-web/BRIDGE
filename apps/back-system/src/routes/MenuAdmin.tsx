@@ -38,11 +38,12 @@ export default function MenuAdmin() {
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  /** 提供パターン。即提供のみか、食後に回すことも選べるか */
+  const [allowsTimingChoice, setAllowsTimingChoice] = useState(false);
 
   // カテゴリ追加フォーム
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [categoryName, setCategoryName] = useState('');
-  const [allowsTiming, setAllowsTiming] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -81,10 +82,12 @@ export default function MenuAdmin() {
         name: name.trim(),
         price: priceValue,
         description: description.trim(),
+        allows_timing_choice: allowsTimingChoice,
       });
       setName('');
       setPrice('');
       setDescription('');
+      setAllowsTimingChoice(false);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : '追加できませんでした');
@@ -100,11 +103,9 @@ export default function MenuAdmin() {
     try {
       await createCategory({
         name: categoryName.trim(),
-        allows_timing_choice: allowsTiming,
         sort_order: categories.length + 1,
       });
       setCategoryName('');
-      setAllowsTiming(false);
       setShowCategoryForm(false);
       await load();
     } catch (e) {
@@ -117,6 +118,18 @@ export default function MenuAdmin() {
   const toggleAvailable = async (item: MenuItem) => {
     try {
       await updateMenuItem(item.id, { is_available: !item.is_available });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '更新できませんでした');
+    }
+  };
+
+  /** 提供パターン(即提供/食後選択可能)の切り替え */
+  const toggleTimingChoice = async (item: MenuItem) => {
+    try {
+      await updateMenuItem(item.id, {
+        allows_timing_choice: !item.allows_timing_choice,
+      });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : '更新できませんでした');
@@ -194,6 +207,17 @@ export default function MenuAdmin() {
                 />
               </Field>
 
+              <Field label="提供パターン">
+                <select
+                  value={allowsTimingChoice ? 'choice' : 'immediate'}
+                  onChange={(e) => setAllowsTimingChoice(e.target.value === 'choice')}
+                  className={inputClass}
+                >
+                  <option value="immediate">即提供のみ</option>
+                  <option value="choice">食中・食後を選択可能にする</option>
+                </select>
+              </Field>
+
               <Field label="価格(円)">
                 <input
                   type="number"
@@ -246,20 +270,6 @@ export default function MenuAdmin() {
                     maxLength={30}
                   />
                 </Field>
-                <label className="flex items-start gap-2 text-sm text-stone-600">
-                  <input
-                    type="checkbox"
-                    checked={allowsTiming}
-                    onChange={(e) => setAllowsTiming(e.target.checked)}
-                    className="mt-0.5 size-4"
-                  />
-                  <span>
-                    お客様が「食中/食後」を選べるようにする
-                    <span className="mt-0.5 block text-xs text-stone-400">
-                      デザート・ドリンクなど
-                    </span>
-                  </span>
-                </label>
                 <Button type="submit" disabled={saving}>
                   カテゴリを追加
                 </Button>
@@ -268,15 +278,7 @@ export default function MenuAdmin() {
 
             <ul className="mt-4 space-y-2 text-sm">
               {categories.map((category) => (
-                <li
-                  key={category.id}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span>{category.name}</span>
-                  {category.allows_timing_choice && (
-                    <Badge tone="amber">食中/食後 選択可</Badge>
-                  )}
-                </li>
+                <li key={category.id}>{category.name}</li>
               ))}
             </ul>
           </Card>
@@ -313,6 +315,11 @@ export default function MenuAdmin() {
                                 <Badge tone="neutral">品切れ</Badge>
                               </span>
                             )}
+                            {item.allows_timing_choice && (
+                              <span className="ml-2">
+                                <Badge tone="amber">食後選択可</Badge>
+                              </span>
+                            )}
                           </p>
                           {item.description && (
                             <p className="truncate text-xs text-stone-400">
@@ -336,6 +343,14 @@ export default function MenuAdmin() {
                           onClick={() => void toggleAvailable(item)}
                         >
                           {item.is_available ? '品切れにする' : '販売再開'}
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          tone="neutral"
+                          onClick={() => void toggleTimingChoice(item)}
+                        >
+                          {item.allows_timing_choice ? '即提供のみに戻す' : '食後選択可にする'}
                         </Button>
 
                         <button

@@ -43,8 +43,6 @@ export interface TableRow {
 export interface Category {
   id: string;
   name: string;
-  /** 客が「食中/食後」を選べるカテゴリか(デザート・ドリンク等) */
-  allows_timing_choice: boolean;
   sort_order: number;
   is_deleted: boolean;
   created_at: string;
@@ -56,6 +54,8 @@ export interface MenuItem {
   name: string;
   price: number;
   description: string;
+  /** 客が「食中/食後」を選べる商品か。商品ごとに店員が設定する */
+  allows_timing_choice: boolean;
   /** 品切れでないか */
   is_available: boolean;
   /** 論理削除フラグ */

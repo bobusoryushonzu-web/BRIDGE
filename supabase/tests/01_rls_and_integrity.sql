@@ -19,7 +19,7 @@ begin
   set local role anon;
   select count(*) into n from public.menu_items;
   reset role;
-  perform pg_temp.check(1, '客がメニューを読める', n = 14);
+  perform pg_temp.check(1, '客がメニューを読める', n = 13);
 exception when others then
   reset role;
   perform pg_temp.check(1, '客がメニューを読める', false);
@@ -99,7 +99,7 @@ begin
   insert into public.orders (session_id) values (v_session) returning id into v_order;
 
   insert into public.order_items (order_id, menu_item_id, item_name, unit_price, quantity, serve_timing)
-  select v_order, id, name, price, 2, 'during' from public.menu_items where name = 'ハンバーグステーキ';
+  select v_order, id, name, price, 2, 'during' from public.menu_items where name = 'ハンバーグ定食';
 
   insert into public.order_items (order_id, menu_item_id, item_name, unit_price, quantity, serve_timing)
   select v_order, id, name, price, 1, 'after' from public.menu_items where name = 'ティラミス';
@@ -196,12 +196,12 @@ end $$;
 do $$
 declare v_total int;
 begin
-  update public.menu_items set price = 9999 where name = 'ハンバーグステーキ';
+  update public.menu_items set price = 9999 where name = 'ハンバーグ定食';
   select total_amount into v_total
     from public.v_session_summary
    where table_number = '1' and status <> 'closed';
   perform pg_temp.check(12, '価格変更後も伝票金額が変わらない', v_total = 3540);
-  update public.menu_items set price = 1480 where name = 'ハンバーグステーキ';
+  update public.menu_items set price = 1480 where name = 'ハンバーグ定食';
 end $$;
 
 -- ============================================================

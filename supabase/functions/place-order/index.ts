@@ -71,7 +71,7 @@ Deno.serve(async (req: Request) => {
   const ids = [...new Set(lines.map((l) => l.menu_item_id))];
   const { data: menuRows, error: menuError } = await admin
     .from('menu_items')
-    .select('id, name, price, is_available, is_deleted, categories(allows_timing_choice)')
+    .select('id, name, price, is_available, is_deleted, allows_timing_choice')
     .in('id', ids);
 
   if (menuError) {
@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
     price: number;
     is_available: boolean;
     is_deleted: boolean;
-    categories: { allows_timing_choice: boolean } | null;
+    allows_timing_choice: boolean;
   };
   const menuById = new Map<string, MenuRow>(
     ((menuRows ?? []) as unknown as MenuRow[]).map((m) => [m.id, m]),
@@ -126,17 +126,16 @@ Deno.serve(async (req: Request) => {
   }
 
   // 商品名と単価はデータベースの値をコピーする(クライアントの申告値は使わない)。
-  // 提供タイミングも、カテゴリが選択を許していなければ「食中」に矯正する。
+  // 提供タイミングも、その商品が選択を許していなければ「食中」に矯正する。
   const rows = lines.map((line) => {
     const item = menuById.get(line.menu_item_id)!;
-    const allowsChoice = item.categories?.allows_timing_choice ?? false;
     return {
       order_id: order.id,
       menu_item_id: item.id,
       item_name: item.name,
       unit_price: item.price,
       quantity: line.quantity,
-      serve_timing: allowsChoice ? line.serve_timing : 'during',
+      serve_timing: item.allows_timing_choice ? line.serve_timing : 'during',
     };
   });
 

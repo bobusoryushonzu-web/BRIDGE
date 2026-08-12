@@ -45,14 +45,15 @@ export default function Menu() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const activeCategory = useMemo(
-    () => categories.find((c) => c.id === activeCategoryId) ?? null,
-    [categories, activeCategoryId],
-  );
-
   const visibleItems = useMemo(
     () => items.filter((item) => item.category_id === activeCategoryId),
     [items, activeCategoryId],
+  );
+
+  // このカテゴリに、提供タイミングを選べる商品が1つでもあれば案内文を出す
+  const hasTimingChoiceItem = useMemo(
+    () => visibleItems.some((item) => item.allows_timing_choice),
+    [visibleItems],
   );
 
   const timingOf = (itemId: string): ServeTiming => timings[itemId] ?? 'during';
@@ -100,9 +101,9 @@ export default function Menu() {
         </div>
       </div>
 
-      {activeCategory?.allows_timing_choice && (
+      {hasTimingChoiceItem && (
         <p className="mx-4 mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          お出しするタイミングを「食中」「食後」からお選びいただけます。
+          一部の商品は、お出しするタイミングを「食中」「食後」からお選びいただけます。
         </p>
       )}
 
@@ -173,7 +174,7 @@ export default function Menu() {
               </div>
 
               {/* 提供タイミングの選択 (FR-03) */}
-              {activeCategory?.allows_timing_choice && !soldOut && (
+              {item.allows_timing_choice && !soldOut && (
                 <div className="mt-3 flex gap-2">
                   {(['during', 'after'] as const).map((option) => (
                     <button
