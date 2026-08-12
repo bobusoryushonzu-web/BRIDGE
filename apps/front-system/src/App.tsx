@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Navigate,
-  Outlet,
-  Route,
-  Routes,
-  useOutletContext,
-} from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useOutletContext } from 'react-router-dom';
 import type { CallType, GetBillResponse } from '@bridge/shared';
 import { CartProvider } from './lib/cart';
 import { getQrToken, getTableNumber } from './lib/table';
@@ -17,7 +11,6 @@ import Entry from './routes/Entry';
 import Menu from './routes/Menu';
 import MyOrders from './routes/MyOrders';
 import Bill from './routes/Bill';
-import NoToken from './routes/NoToken';
 
 /** 各画面が受け取る共有状態 */
 export interface AppContext {
@@ -26,7 +19,18 @@ export interface AppContext {
   bill: GetBillResponse | null;
   reloadBill: () => Promise<void>;
   notify: (message: string) => void;
+  /** QR未読み取りのデザイン確認用アクセスか。true のときは実際の送信は行われない */
+  isPreview: boolean;
 }
+
+/** QR未読み取りでアクセスされた場合、伝票を空の状態にしてスピナーが回り続けないようにする */
+const EMPTY_BILL: GetBillResponse = {
+  table: { id: '', table_number: '' },
+  session: null,
+  lines: [],
+  total: 0,
+  has_pending_after_items: false,
+};
 
 export function useAppContext(): AppContext {
   return useOutletContext<AppContext>();
@@ -41,8 +45,13 @@ export function useAppContext(): AppContext {
 function Layout() {
   const qrToken = getQrToken();
   const tableNumber = getTableNumber();
+  const isPreview = !qrToken;
 
-  const [bill, setBill] = useState<GetBillResponse | null>(null);
+  // プレビュー時は取得しようがないので、空の伝票をそのまま初期値にする
+  // (null のままだと注文内容・お会計の画面がずっと読み込み中のままになる)
+  const [bill, setBill] = useState<GetBillResponse | null>(
+    isPreview ? EMPTY_BILL : null,
+  );
   const [callSheetOpen, setCallSheetOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -83,21 +92,24 @@ function Layout() {
     [qrToken, notify, reloadBill],
   );
 
-  // QR を読み取っていない状態で直接アクセスされた場合
-  if (!qrToken) {
-    return <Navigate to="/start" replace />;
-  }
-
   const context: AppContext = {
-    qrToken,
+    qrToken: qrToken ?? '',
     tableNumber,
     bill,
     reloadBill,
     notify,
+    isPreview,
   };
 
   return (
     <div className="mx-auto min-h-full max-w-lg pb-20">
+      {/* QR未読み取りでの直接アクセス。デザイン確認はできるが、実際の送信はできない */}
+      {isPreview && (
+        <div className="bg-amber-100 px-4 py-2 text-center text-xs font-bold text-amber-900">
+          デザイン確認用のプレビューです。実際のご注文はテーブルのQRコードから行ってください。
+        </div>
+      )}
+
       <Outlet context={context} />
 
       <BottomNav
@@ -123,9 +135,10 @@ export default function App() {
       <Routes>
         {/* QR コードから開かれる入口 */}
         <Route path="/t/:qrToken" element={<Entry />} />
-        <Route path="/start" element={<NoToken />} />
 
         <Route element={<Layout />}>
+          {/* QRを読み取っていなくても /start ではデザイン確認用に注文ページを表示する */}
+          <Route path="/start" element={<Menu />} />
           <Route path="/menu" element={<Menu />} />
           <Route path="/orders" element={<MyOrders />} />
           <Route path="/bill" element={<Bill />} />
