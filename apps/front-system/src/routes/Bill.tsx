@@ -71,6 +71,13 @@ export default function Bill() {
               <li key={line.id} className="flex items-start gap-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="leading-snug">{line.item_name}</p>
+                  {line.options.length > 0 && (
+                    <p className="text-xs text-stone-500">
+                      {line.options
+                        .map((o) => `${o.name}(+${formatYen(o.extra_price)})`)
+                        .join('、')}
+                    </p>
+                  )}
                   <p className="text-sm tabular-nums text-stone-500">
                     {formatYen(line.unit_price)} × {line.quantity}
                   </p>

@@ -10,6 +10,7 @@ import type {
   GetBillResponse,
   GetSessionResponse,
   MenuItem,
+  MenuItemOption,
   PlaceOrderItem,
   PlaceOrderResponse,
 } from '@bridge/shared';
@@ -70,18 +71,21 @@ export function callStaff(qrToken: string, type: CallType) {
 export async function fetchMenu(): Promise<{
   categories: Category[];
   items: MenuItem[];
+  options: MenuItemOption[];
 }> {
-  const [categoriesResult, itemsResult] = await Promise.all([
+  const [categoriesResult, itemsResult, optionsResult] = await Promise.all([
     supabase.from('categories').select('*').order('sort_order'),
     supabase.from('menu_items').select('*').order('sort_order'),
+    supabase.from('menu_item_options').select('*').order('sort_order'),
   ]);
 
-  if (categoriesResult.error || itemsResult.error) {
+  if (categoriesResult.error || itemsResult.error || optionsResult.error) {
     throw new Error('メニューの読み込みに失敗しました');
   }
 
   return {
     categories: (categoriesResult.data ?? []) as Category[],
     items: (itemsResult.data ?? []) as MenuItem[],
+    options: (optionsResult.data ?? []) as MenuItemOption[],
   };
 }

@@ -111,6 +111,18 @@ export interface StaffUser {
   created_at: string;
 }
 
+/** 商品オプション(例: ご飯大盛+50円)。商品ごとに0件以上持つ */
+export interface MenuItemOption {
+  id: string;
+  menu_item_id: string;
+  name: string;
+  /** 追加料金(1点あたり) */
+  extra_price: number;
+  is_deleted: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 /** v_session_summary ビュー(BACK-system の注文照会用) */
 export interface SessionSummary {
   session_id: string;
@@ -146,6 +158,8 @@ export interface PlaceOrderItem {
   menu_item_id: string;
   quantity: number;
   serve_timing: ServeTiming;
+  /** 選択したオプションのID一覧(選ばなければ空配列) */
+  option_ids: string[];
 }
 
 /** place-order のレスポンス */
@@ -154,16 +168,24 @@ export interface PlaceOrderResponse {
   session_id: string;
 }
 
+/** 伝票1行に含まれる、選択されたオプション */
+export interface BillLineOption {
+  name: string;
+  extra_price: number;
+}
+
 /** 伝票の1行 */
 export interface BillLine {
   id: string;
   item_name: string;
+  /** 選んだオプションの追加料金を含んだ単価 */
   unit_price: number;
   quantity: number;
   subtotal: number;
   serve_timing: ServeTiming;
   status: ItemStatus;
   ordered_at: string;
+  options: BillLineOption[];
 }
 
 /** get-bill のレスポンス(FR-05 注文内容確認 / FR-09 デジタル伝票) */

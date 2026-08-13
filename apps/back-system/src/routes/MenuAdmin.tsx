@@ -5,15 +5,19 @@
  * 一時的に出せないだけなら「品切れ」を使う。
  */
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import type { Category, MenuItem } from '@bridge/shared';
+import type { Category, MenuItem, MenuItemOption } from '@bridge/shared';
 import { formatYen } from '@bridge/shared';
 import {
   createCategory,
   createMenuItem,
+  createMenuItemOption,
   deleteMenuItem,
+  deleteMenuItemOption,
   fetchCategories,
+  fetchMenuItemOptions,
   fetchMenuItems,
   updateMenuItem,
+  updateMenuItemOption,
 } from '../lib/queries';
 import {
   Badge,
@@ -26,9 +30,16 @@ import {
   inputClass,
 } from '../components/ui';
 
+/** 追加フォームで入力中のオプション1行分 */
+interface OptionDraft {
+  name: string;
+  price: string;
+}
+
 export default function MenuAdmin() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [options, setOptions] = useState<MenuItemOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -40,19 +51,31 @@ export default function MenuAdmin() {
   const [categoryId, setCategoryId] = useState('');
   /** 提供パターン。即提供のみか、食後に回すことも選べるか */
   const [allowsTimingChoice, setAllowsTimingChoice] = useState(false);
+  /** オプションあり/なし。ありの場合のみ下の入力欄を出す */
+  const [hasOptions, setHasOptions] = useState(false);
+  const [optionDrafts, setOptionDrafts] = useState<OptionDraft[]>([
+    { name: '', price: '' },
+  ]);
 
   // カテゴリ追加フォーム
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [categoryName, setCategoryName] = useState('');
 
+  // 商品一覧側の、オプション管理を開いている商品
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [newOptionName, setNewOptionName] = useState('');
+  const [newOptionPrice, setNewOptionPrice] = useState('');
+
   const load = useCallback(async () => {
     try {
-      const [nextCategories, nextItems] = await Promise.all([
+      const [nextCategories, nextItems, nextOptions] = await Promise.all([
         fetchCategories(),
         fetchMenuItems(),
+        fetchMenuItemOptions(),
       ]);
       setCategories(nextCategories);
       setItems(nextItems);
+      setOptions(nextOptions);
       setCategoryId((current) => current || nextCategories[0]?.id || '');
       setError(null);
     } catch (e) {
@@ -75,25 +98,67 @@ export default function MenuAdmin() {
       return;
     }
 
+    // オプションありの場合、名前と価格の両方が埋まっている行だけを登録対象にする
+    const validOptionDrafts = hasOptions
+      ? optionDrafts.filter((d) => d.name.trim() !== '' && d.price.trim() !== '')
+      : [];
+    if (hasOptions) {
+      for (const draft of validOptionDrafts) {
+        const optionPrice = Number(draft.price);
+        if (!Number.isInteger(optionPrice) || optionPrice < 0) {
+          setError('オプションの追加料金は0以上の整数で入力してください');
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
-      await createMenuItem({
+      const itemId = await createMenuItem({
         category_id: categoryId,
         name: name.trim(),
         price: priceValue,
         description: description.trim(),
         allows_timing_choice: allowsTimingChoice,
       });
+
+      for (let i = 0; i < validOptionDrafts.length; i++) {
+        await createMenuItemOption({
+          menu_item_id: itemId,
+          name: validOptionDrafts[i].name.trim(),
+          extra_price: Number(validOptionDrafts[i].price),
+          sort_order: i + 1,
+        });
+      }
+
       setName('');
       setPrice('');
       setDescription('');
       setAllowsTimingChoice(false);
+      setHasOptions(false);
+      setOptionDrafts([{ name: '', price: '' }]);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : '追加できませんでした');
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateOptionDraft = (index: number, patch: Partial<OptionDraft>) => {
+    setOptionDrafts((prev) =>
+      prev.map((d, i) => (i === index ? { ...d, ...patch } : d)),
+    );
+  };
+
+  const addOptionDraftRow = () => {
+    setOptionDrafts((prev) => [...prev, { name: '', price: '' }]);
+  };
+
+  const removeOptionDraftRow = (index: number) => {
+    setOptionDrafts((prev) =>
+      prev.length <= 1 ? prev : prev.filter((_, i) => i !== index),
+    );
   };
 
   const handleAddCategory = async (event: FormEvent) => {
@@ -149,6 +214,59 @@ export default function MenuAdmin() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : '更新できませんでした');
+    }
+  };
+
+  const handleAddOptionToItem = async (itemId: string) => {
+    const priceValue = Number(newOptionPrice);
+    if (!newOptionName.trim()) return;
+    if (!Number.isInteger(priceValue) || priceValue < 0) {
+      setError('オプションの追加料金は0以上の整数で入力してください');
+      return;
+    }
+    try {
+      await createMenuItemOption({
+        menu_item_id: itemId,
+        name: newOptionName.trim(),
+        extra_price: priceValue,
+        sort_order: options.filter((o) => o.menu_item_id === itemId).length + 1,
+      });
+      setNewOptionName('');
+      setNewOptionPrice('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'オプションを追加できませんでした');
+    }
+  };
+
+  const handleChangeOptionPrice = async (option: MenuItemOption) => {
+    const input = window.prompt(
+      `「${option.name}」の新しい追加料金を入力してください`,
+      String(option.extra_price),
+    );
+    if (input === null) return;
+    const value = Number(input);
+    if (!Number.isInteger(value) || value < 0) {
+      setError('追加料金は0以上の整数で入力してください');
+      return;
+    }
+    try {
+      await updateMenuItemOption(option.id, { extra_price: value });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '更新できませんでした');
+    }
+  };
+
+  const handleDeleteOption = async (option: MenuItemOption) => {
+    if (!window.confirm(`「${option.name}」オプションを削除します。よろしいですか？`)) {
+      return;
+    }
+    try {
+      await deleteMenuItemOption(option.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '削除できませんでした');
     }
   };
 
@@ -241,6 +359,61 @@ export default function MenuAdmin() {
                 />
               </Field>
 
+              <Field label="オプション">
+                <select
+                  value={hasOptions ? 'yes' : 'no'}
+                  onChange={(e) => setHasOptions(e.target.value === 'yes')}
+                  className={inputClass}
+                >
+                  <option value="no">オプションなし</option>
+                  <option value="yes">オプションあり</option>
+                </select>
+              </Field>
+
+              {hasOptions && (
+                <div className="space-y-2 rounded-xl bg-stone-50 p-3">
+                  {optionDrafts.map((draft, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <input
+                        value={draft.name}
+                        onChange={(e) =>
+                          updateOptionDraft(index, { name: e.target.value })
+                        }
+                        placeholder="例: ごはん大盛"
+                        className={`${inputClass} flex-1`}
+                        maxLength={30}
+                      />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        step={1}
+                        value={draft.price}
+                        onChange={(e) =>
+                          updateOptionDraft(index, { price: e.target.value })
+                        }
+                        placeholder="100"
+                        className={`${inputClass} w-24`}
+                      />
+                      <span className="shrink-0 text-sm text-stone-500">円</span>
+                      {optionDrafts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeOptionDraftRow(index)}
+                          aria-label="このオプション行を削除"
+                          className="shrink-0 rounded-lg px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100"
+                        >
+                          削除
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <Button size="sm" tone="neutral" onClick={addOptionDraftRow}>
+                    オプションをもう1つ追加
+                  </Button>
+                </div>
+              )}
+
               <Button type="submit" disabled={saving}>
                 {saving ? '追加しています…' : 'この内容で追加'}
               </Button>
@@ -302,7 +475,8 @@ export default function MenuAdmin() {
                 ) : (
                   <ul className="divide-y divide-stone-100">
                     {categoryItems.map((item) => (
-                      <li key={item.id} className="flex items-center gap-3 py-3">
+                      <li key={item.id} className="py-3">
+                      <div className="flex items-center gap-3">
                         <div className="min-w-0 flex-1">
                           <p
                             className={`font-medium ${
@@ -318,6 +492,13 @@ export default function MenuAdmin() {
                             {item.allows_timing_choice && (
                               <span className="ml-2">
                                 <Badge tone="amber">食後選択可</Badge>
+                              </span>
+                            )}
+                            {options.filter((o) => o.menu_item_id === item.id).length > 0 && (
+                              <span className="ml-2">
+                                <Badge tone="neutral">
+                                  オプション{options.filter((o) => o.menu_item_id === item.id).length}件
+                                </Badge>
                               </span>
                             )}
                           </p>
@@ -353,6 +534,20 @@ export default function MenuAdmin() {
                           {item.allows_timing_choice ? '即提供のみに戻す' : '食後選択可にする'}
                         </Button>
 
+                        <Button
+                          size="sm"
+                          tone="neutral"
+                          onClick={() => {
+                            setExpandedItemId((current) =>
+                              current === item.id ? null : item.id,
+                            );
+                            setNewOptionName('');
+                            setNewOptionPrice('');
+                          }}
+                        >
+                          {expandedItemId === item.id ? 'オプションを閉じる' : 'オプション管理'}
+                        </Button>
+
                         <button
                           type="button"
                           onClick={() => void handleDelete(item)}
@@ -360,6 +555,72 @@ export default function MenuAdmin() {
                         >
                           削除
                         </button>
+                      </div>
+
+                      {expandedItemId === item.id && (
+                        <div className="mt-3 rounded-xl bg-stone-50 p-3">
+                          {options.filter((o) => o.menu_item_id === item.id).length === 0 ? (
+                            <p className="text-sm text-stone-400">
+                              まだオプションがありません
+                            </p>
+                          ) : (
+                            <ul className="space-y-2">
+                              {options
+                                .filter((o) => o.menu_item_id === item.id)
+                                .map((option) => (
+                                  <li
+                                    key={option.id}
+                                    className="flex items-center gap-2 text-sm"
+                                  >
+                                    <span className="flex-1">{option.name}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleChangeOptionPrice(option)}
+                                      className="shrink-0 rounded-lg px-2 py-1 font-bold tabular-nums hover:bg-stone-200"
+                                      title="追加料金を変更"
+                                    >
+                                      +{formatYen(option.extra_price)}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleDeleteOption(option)}
+                                      className="shrink-0 rounded-lg px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100"
+                                    >
+                                      削除
+                                    </button>
+                                  </li>
+                                ))}
+                            </ul>
+                          )}
+
+                          <div className="mt-3 flex items-center gap-2">
+                            <input
+                              value={newOptionName}
+                              onChange={(e) => setNewOptionName(e.target.value)}
+                              placeholder="例: 麺ダブル"
+                              className={`${inputClass} flex-1`}
+                              maxLength={30}
+                            />
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              step={1}
+                              value={newOptionPrice}
+                              onChange={(e) => setNewOptionPrice(e.target.value)}
+                              placeholder="100"
+                              className={`${inputClass} w-24`}
+                            />
+                            <span className="shrink-0 text-sm text-stone-500">円</span>
+                            <Button
+                              size="sm"
+                              onClick={() => void handleAddOptionToItem(item.id)}
+                            >
+                              追加
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       </li>
                     ))}
                   </ul>

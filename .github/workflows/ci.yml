@@ -69,6 +69,8 @@ jobs:
           $PSQL -f supabase/tests/01_rls_and_integrity.sql | tee /tmp/result.txt
           # 来店から会計までの通し検証(18項目)
           $PSQL -f supabase/tests/02_end_to_end_flow.sql | tee -a /tmp/result.txt
+          # 商品オプション(8項目)
+          $PSQL -f supabase/tests/03_menu_item_options.sql | tee -a /tmp/result.txt
           if grep -q 'FAIL' /tmp/result.txt; then
             echo '::error::検証に失敗した項目があります'
             exit 1

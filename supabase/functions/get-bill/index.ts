@@ -24,6 +24,12 @@ interface ItemRow {
   created_at: string;
 }
 
+interface OptionRow {
+  order_item_id: string;
+  option_name: string;
+  extra_price: number;
+}
+
 Deno.serve(async (req: Request) => {
   const preflight = handlePreflight(req);
   if (preflight) return preflight;
@@ -91,6 +97,25 @@ Deno.serve(async (req: Request) => {
 
   const rows = (items ?? []) as ItemRow[];
 
+  // 選択されたオプションをまとめて取得し、明細ごとに紐づける
+  const itemIds = rows.map((row) => row.id);
+  const optionsByItem = new Map<string, OptionRow[]>();
+  if (itemIds.length > 0) {
+    const { data: optionRows, error: optionsError } = await admin
+      .from('order_item_options')
+      .select('order_item_id, option_name, extra_price')
+      .in('order_item_id', itemIds);
+
+    if (optionsError) {
+      return errorResponse('伝票の読み込みに失敗しました', 500);
+    }
+    for (const option of (optionRows ?? []) as OptionRow[]) {
+      const list = optionsByItem.get(option.order_item_id) ?? [];
+      list.push(option);
+      optionsByItem.set(option.order_item_id, list);
+    }
+  }
+
   const lines = rows.map((row) => ({
     id: row.id,
     item_name: row.item_name,
@@ -100,6 +125,10 @@ Deno.serve(async (req: Request) => {
     serve_timing: row.serve_timing,
     status: row.status,
     ordered_at: row.created_at,
+    options: (optionsByItem.get(row.id) ?? []).map((o) => ({
+      name: o.option_name,
+      extra_price: o.extra_price,
+    })),
   }));
 
   const total = lines.reduce((sum, line) => sum + line.subtotal, 0);

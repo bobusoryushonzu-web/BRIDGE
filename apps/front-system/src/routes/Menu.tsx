@@ -2,11 +2,11 @@
  * メニュー・注文画面 (FR-02 / FR-03 / FR-04)
  */
 import { useEffect, useMemo, useState } from 'react';
-import type { Category, MenuItem, ServeTiming } from '@bridge/shared';
+import type { Category, MenuItem, MenuItemOption, ServeTiming } from '@bridge/shared';
 import { SERVE_TIMING_LABEL, formatYen } from '@bridge/shared';
 import { useAppContext } from '../App';
 import { fetchMenu, placeOrder } from '../lib/api';
-import { useCart } from '../lib/cart';
+import { type CartOption, lineUnitPrice, useCart } from '../lib/cart';
 import { ErrorView, Header, PrimaryButton, Spinner } from '../components/ui';
 
 export default function Menu() {
@@ -15,12 +15,15 @@ export default function Menu() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [options, setOptions] = useState<MenuItemOption[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   /** 商品ごとに選択中の提供タイミング。既定は食中 */
   const [timings, setTimings] = useState<Record<string, ServeTiming>>({});
+  /** 商品ごとに選択中のオプションID */
+  const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string[]>>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,6 +34,7 @@ export default function Menu() {
       const menu = await fetchMenu();
       setCategories(menu.categories);
       setItems(menu.items);
+      setOptions(menu.options);
       setActiveCategoryId((current) => current ?? menu.categories[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'メニューを読み込めませんでした');
@@ -45,6 +49,16 @@ export default function Menu() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const optionsByItem = useMemo(() => {
+    const map = new Map<string, MenuItemOption[]>();
+    for (const option of options) {
+      const list = map.get(option.menu_item_id) ?? [];
+      list.push(option);
+      map.set(option.menu_item_id, list);
+    }
+    return map;
+  }, [options]);
+
   const visibleItems = useMemo(
     () => items.filter((item) => item.category_id === activeCategoryId),
     [items, activeCategoryId],
@@ -57,6 +71,25 @@ export default function Menu() {
   );
 
   const timingOf = (itemId: string): ServeTiming => timings[itemId] ?? 'during';
+
+  /** 商品ごとに、現在選択中のオプションを CartOption の形で返す */
+  const selectedOptionsOf = (itemId: string): CartOption[] => {
+    const itemOptions = optionsByItem.get(itemId) ?? [];
+    const selectedIds = selectedOptionIds[itemId] ?? [];
+    return itemOptions
+      .filter((o) => selectedIds.includes(o.id))
+      .map((o) => ({ id: o.id, name: o.name, extraPrice: o.extra_price }));
+  };
+
+  const toggleOption = (itemId: string, optionId: string) => {
+    setSelectedOptionIds((prev) => {
+      const current = prev[itemId] ?? [];
+      const next = current.includes(optionId)
+        ? current.filter((id) => id !== optionId)
+        : [...current, optionId];
+      return { ...prev, [itemId]: next };
+    });
+  };
 
   const handleSubmit = async () => {
     if (cart.lines.length === 0) return;
@@ -110,8 +143,11 @@ export default function Menu() {
       <ul className="divide-y divide-stone-200 px-4">
         {visibleItems.map((item) => {
           const timing = timingOf(item.id);
-          const quantity = cart.quantityOf(item.id, timing);
+          const itemOptions = optionsByItem.get(item.id) ?? [];
+          const chosenOptions = selectedOptionsOf(item.id);
+          const quantity = cart.quantityOf(item.id, timing, chosenOptions);
           const soldOut = !item.is_available;
+          const unitPrice = lineUnitPrice({ price: item.price, options: chosenOptions });
 
           return (
             <li key={item.id} className="py-4">
@@ -133,7 +169,12 @@ export default function Menu() {
                     </p>
                   )}
                   <p className="mt-1.5 font-bold text-amber-800">
-                    {formatYen(item.price)}
+                    {formatYen(unitPrice)}
+                    {chosenOptions.length > 0 && (
+                      <span className="ml-1 text-xs font-medium text-stone-500">
+                        (本体 {formatYen(item.price)})
+                      </span>
+                    )}
                   </p>
                 </div>
 
@@ -144,7 +185,7 @@ export default function Menu() {
                       <button
                         type="button"
                         aria-label={`${item.name}を1つ減らす`}
-                        onClick={() => cart.remove(item.id, timing)}
+                        onClick={() => cart.remove(item.id, timing, chosenOptions)}
                         className="size-9 rounded-full border border-stone-300 text-lg font-bold text-stone-600 active:bg-stone-100"
                       >
                         −
@@ -164,6 +205,7 @@ export default function Menu() {
                         name: item.name,
                         price: item.price,
                         serveTiming: timing,
+                        options: chosenOptions,
                       })
                     }
                     className="size-9 rounded-full bg-amber-600 text-lg font-bold text-white active:bg-amber-700 disabled:bg-stone-200 disabled:text-stone-400"
@@ -190,13 +232,39 @@ export default function Menu() {
                       }`}
                     >
                       {SERVE_TIMING_LABEL[option]}に
-                      {cart.quantityOf(item.id, option) > 0 && (
+                      {cart.quantityOf(item.id, option, chosenOptions) > 0 && (
                         <span className="ml-1 text-xs">
-                          ({cart.quantityOf(item.id, option)})
+                          ({cart.quantityOf(item.id, option, chosenOptions)})
                         </span>
                       )}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {/* オプションの選択 */}
+              {itemOptions.length > 0 && !soldOut && (
+                <div className="mt-3 space-y-1.5">
+                  {itemOptions.map((option) => {
+                    const checked = (selectedOptionIds[item.id] ?? []).includes(option.id);
+                    return (
+                      <label
+                        key={option.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleOption(item.id, option.id)}
+                          className="size-4"
+                        />
+                        <span className="flex-1">{option.name}</span>
+                        <span className="text-stone-500">
+                          +{formatYen(option.extra_price)}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               )}
             </li>
@@ -247,20 +315,29 @@ export default function Menu() {
             <ul className="divide-y divide-stone-100">
               {cart.lines.map((line) => (
                 <li
-                  key={`${line.menuItemId}:${line.serveTiming}`}
+                  key={`${line.menuItemId}:${line.serveTiming}:${line.options.map((o) => o.id).join(',')}`}
                   className="flex items-center gap-3 py-3"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{line.name}</p>
                     <p className="text-sm text-stone-500">
                       {SERVE_TIMING_LABEL[line.serveTiming]}に・
-                      {formatYen(line.price)}
+                      {formatYen(lineUnitPrice(line))}
                     </p>
+                    {line.options.length > 0 && (
+                      <p className="text-xs text-stone-400">
+                        {line.options
+                          .map((o) => `${o.name}(+${formatYen(o.extraPrice)})`)
+                          .join('、')}
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"
                     aria-label={`${line.name}を1つ減らす`}
-                    onClick={() => cart.remove(line.menuItemId, line.serveTiming)}
+                    onClick={() =>
+                      cart.remove(line.menuItemId, line.serveTiming, line.options)
+                    }
                     className="size-8 rounded-full border border-stone-300 font-bold text-stone-600 active:bg-stone-100"
                   >
                     −
@@ -277,6 +354,7 @@ export default function Menu() {
                         name: line.name,
                         price: line.price,
                         serveTiming: line.serveTiming,
+                        options: line.options,
                       })
                     }
                     className="size-8 rounded-full bg-amber-600 font-bold text-white active:bg-amber-700"

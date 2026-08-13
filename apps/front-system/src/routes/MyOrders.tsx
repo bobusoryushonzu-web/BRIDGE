@@ -31,6 +31,11 @@ function LineRow({ line }: { line: BillLine }) {
             <span className="ml-1.5 text-stone-500">×{line.quantity}</span>
           )}
         </p>
+        {line.options.length > 0 && (
+          <p className="text-xs text-stone-500">
+            {line.options.map((o) => o.name).join('、')}
+          </p>
+        )}
         <p className="text-xs text-stone-400">
           {formatTime(line.ordered_at)} 注文・{served ? '提供済み' : '準備中'}
         </p>
