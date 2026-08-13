@@ -176,6 +176,12 @@ export default function Menu() {
                       </span>
                     )}
                   </p>
+                  {item.combo_discount_amount > 0 && item.combo_discount_name && (
+                    <p className="mt-0.5 text-xs font-medium text-emerald-700">
+                      他の商品と一緒のご注文で{item.combo_discount_name}
+                      (-{formatYen(item.combo_discount_amount)})
+                    </p>
+                  )}
                 </div>
 
                 {/* 数量の増減 */}

@@ -56,6 +56,9 @@ export default function MenuAdmin() {
   const [optionDrafts, setOptionDrafts] = useState<OptionDraft[]>([
     { name: '', price: '' },
   ]);
+  /** セット割引(ドリンクカテゴリの商品のみ設定可能) */
+  const [comboDiscountName, setComboDiscountName] = useState('');
+  const [comboDiscountAmount, setComboDiscountAmount] = useState('');
 
   // カテゴリ追加フォーム
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -89,6 +92,9 @@ export default function MenuAdmin() {
     void load();
   }, [load]);
 
+  const selectedCategory = categories.find((c) => c.id === categoryId);
+  const isDrinkCategory = selectedCategory?.is_drink ?? false;
+
   const handleAddItem = async (event: FormEvent) => {
     event.preventDefault();
     const priceValue = Number(price);
@@ -112,6 +118,18 @@ export default function MenuAdmin() {
       }
     }
 
+    // セット割引はドリンクカテゴリの商品にのみ設定できる。名前・金額とも
+    // 入力されている場合だけ登録対象にする
+    let comboDiscount: { name: string | null; amount: number } | null = null;
+    if (isDrinkCategory && comboDiscountName.trim() !== '' && comboDiscountAmount.trim() !== '') {
+      const discountValue = Number(comboDiscountAmount);
+      if (!Number.isInteger(discountValue) || discountValue < 0) {
+        setError('セット割引の金額は0以上の整数で入力してください');
+        return;
+      }
+      comboDiscount = { name: comboDiscountName.trim(), amount: discountValue };
+    }
+
     setSaving(true);
     try {
       const itemId = await createMenuItem({
@@ -120,6 +138,8 @@ export default function MenuAdmin() {
         price: priceValue,
         description: description.trim(),
         allows_timing_choice: allowsTimingChoice,
+        combo_discount_name: comboDiscount?.name ?? null,
+        combo_discount_amount: comboDiscount?.amount ?? 0,
       });
 
       for (let i = 0; i < validOptionDrafts.length; i++) {
@@ -137,6 +157,8 @@ export default function MenuAdmin() {
       setAllowsTimingChoice(false);
       setHasOptions(false);
       setOptionDrafts([{ name: '', price: '' }]);
+      setComboDiscountName('');
+      setComboDiscountAmount('');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : '追加できませんでした');
@@ -211,6 +233,47 @@ export default function MenuAdmin() {
     }
     try {
       await updateMenuItem(item.id, { price: value });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '更新できませんでした');
+    }
+  };
+
+  /** セット割引の設定・変更・解除(ドリンクカテゴリの商品のみ) */
+  const changeComboDiscount = async (item: MenuItem) => {
+    const nameInput = window.prompt(
+      `「${item.name}」のセット割引の名称を入力してください(空欄にすると割引を解除します)`,
+      item.combo_discount_name ?? 'セット割引',
+    );
+    if (nameInput === null) return;
+    const trimmedName = nameInput.trim();
+
+    if (trimmedName === '') {
+      try {
+        await updateMenuItem(item.id, { combo_discount_name: null, combo_discount_amount: 0 });
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '更新できませんでした');
+      }
+      return;
+    }
+
+    const amountInput = window.prompt(
+      `「${trimmedName}」の割引額(円)を入力してください`,
+      String(item.combo_discount_amount || ''),
+    );
+    if (amountInput === null) return;
+    const amountValue = Number(amountInput);
+    if (!Number.isInteger(amountValue) || amountValue < 0) {
+      setError('割引額は0以上の整数で入力してください');
+      return;
+    }
+
+    try {
+      await updateMenuItem(item.id, {
+        combo_discount_name: trimmedName,
+        combo_discount_amount: amountValue,
+      });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : '更新できませんでした');
@@ -414,6 +477,35 @@ export default function MenuAdmin() {
                 </div>
               )}
 
+              {isDrinkCategory && (
+                <div className="space-y-2 rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
+                  <p className="text-xs font-medium text-amber-900">
+                    セット割引(ドリンク以外の商品と同じ来店で注文すると自動で割引)。
+                    空欄のままなら設定しません
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={comboDiscountName}
+                      onChange={(e) => setComboDiscountName(e.target.value)}
+                      placeholder="例: セット割引"
+                      className={`${inputClass} flex-1`}
+                      maxLength={30}
+                    />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      value={comboDiscountAmount}
+                      onChange={(e) => setComboDiscountAmount(e.target.value)}
+                      placeholder="100"
+                      className={`${inputClass} w-24`}
+                    />
+                    <span className="shrink-0 text-sm text-stone-500">円引き</span>
+                  </div>
+                </div>
+              )}
+
               <Button type="submit" disabled={saving}>
                 {saving ? '追加しています…' : 'この内容で追加'}
               </Button>
@@ -501,6 +593,13 @@ export default function MenuAdmin() {
                                 </Badge>
                               </span>
                             )}
+                            {item.combo_discount_amount > 0 && item.combo_discount_name && (
+                              <span className="ml-2">
+                                <Badge tone="emerald">
+                                  {item.combo_discount_name} -{formatYen(item.combo_discount_amount)}
+                                </Badge>
+                              </span>
+                            )}
                           </p>
                           {item.description && (
                             <p className="truncate text-xs text-stone-400">
@@ -533,6 +632,16 @@ export default function MenuAdmin() {
                         >
                           {item.allows_timing_choice ? '即提供のみに戻す' : '食後選択可にする'}
                         </Button>
+
+                        {category.is_drink && (
+                          <Button
+                            size="sm"
+                            tone="neutral"
+                            onClick={() => void changeComboDiscount(item)}
+                          >
+                            セット割引
+                          </Button>
+                        )}
 
                         <Button
                           size="sm"

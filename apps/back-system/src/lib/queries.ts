@@ -320,6 +320,10 @@ export async function createMenuItem(input: {
   description: string;
   /** 客が「食中/食後」を選べる商品か */
   allows_timing_choice: boolean;
+  /** セット割引の名称。ドリンク以外と設定しない商品では省略してよい */
+  combo_discount_name?: string | null;
+  /** セット割引の金額(円) */
+  combo_discount_amount?: number;
 }): Promise<string> {
   const { data, error } = await supabase
     .from('menu_items')
@@ -335,7 +339,13 @@ export async function updateMenuItem(
   patch: Partial<
     Pick<
       MenuItem,
-      'name' | 'price' | 'description' | 'is_available' | 'allows_timing_choice'
+      | 'name'
+      | 'price'
+      | 'description'
+      | 'is_available'
+      | 'allows_timing_choice'
+      | 'combo_discount_name'
+      | 'combo_discount_amount'
     >
   >,
 ): Promise<void> {

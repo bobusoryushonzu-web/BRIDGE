@@ -74,7 +74,10 @@ export default function Bill() {
                   {line.options.length > 0 && (
                     <p className="text-xs text-stone-500">
                       {line.options
-                        .map((o) => `${o.name}(+${formatYen(o.extra_price)})`)
+                        .map(
+                          (o) =>
+                            `${o.name}(${o.extra_price >= 0 ? '+' : ''}${formatYen(o.extra_price)})`,
+                        )
                         .join('、')}
                     </p>
                   )}

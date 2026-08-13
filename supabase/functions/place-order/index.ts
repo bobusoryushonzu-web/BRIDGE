@@ -87,7 +87,9 @@ Deno.serve(async (req: Request) => {
   const ids = [...new Set(lines.map((l) => l.menu_item_id))];
   const { data: menuRows, error: menuError } = await admin
     .from('menu_items')
-    .select('id, name, price, is_available, is_deleted, allows_timing_choice')
+    .select(
+      'id, name, price, is_available, is_deleted, allows_timing_choice, category_id, combo_discount_name, combo_discount_amount',
+    )
     .in('id', ids);
 
   if (menuError) {
@@ -101,6 +103,9 @@ Deno.serve(async (req: Request) => {
     is_available: boolean;
     is_deleted: boolean;
     allows_timing_choice: boolean;
+    category_id: string;
+    combo_discount_name: string | null;
+    combo_discount_amount: number;
   };
   const menuById = new Map<string, MenuRow>(
     ((menuRows ?? []) as unknown as MenuRow[]).map((m) => [m.id, m]),
@@ -120,6 +125,26 @@ Deno.serve(async (req: Request) => {
       409,
     );
   }
+
+  // ---- ドリンクのセット割引判定に使う、カテゴリごとのドリンク区分を取得する ----
+  const categoryIds = [
+    ...new Set(((menuRows ?? []) as unknown as MenuRow[]).map((m) => m.category_id)),
+  ];
+  const { data: categoryRows, error: categoryError } = await admin
+    .from('categories')
+    .select('id, is_drink')
+    .in('id', categoryIds);
+
+  if (categoryError) {
+    return errorResponse('カテゴリの読み込みに失敗しました', 500);
+  }
+  const isDrinkByCategory = new Map<string, boolean>(
+    ((categoryRows ?? []) as { id: string; is_drink: boolean }[]).map((c) => [
+      c.id,
+      c.is_drink,
+    ]),
+  );
+  const isDrinkItem = (item: MenuRow) => isDrinkByCategory.get(item.category_id) ?? false;
 
   // ---- オプションの実在・商品との対応をデータベース側で確認する ----
   const optionIds = [...new Set(lines.flatMap((l) => l.option_ids))];
@@ -163,6 +188,24 @@ Deno.serve(async (req: Request) => {
     return errorResponse('席の利用開始に失敗しました', 500);
   }
 
+  // ---- ドリンクのセット割引: 来店中にドリンク以外の商品を注文済みか ----
+  // 今回の注文にドリンク以外が含まれていれば、その時点で条件を満たす。
+  // 含まれていなければ、同じセッションの過去の注文明細(category_is_drink
+  // にスナップショットしてある)を確認する。
+  let sessionHasNonDrink = lines.some((line) => !isDrinkItem(menuById.get(line.menu_item_id)!));
+  if (!sessionHasNonDrink) {
+    const { count: nonDrinkCount, error: historyError } = await admin
+      .from('order_items')
+      .select('id, orders!inner(session_id)', { count: 'exact', head: true })
+      .eq('category_is_drink', false)
+      .eq('orders.session_id', sessionId);
+
+    if (historyError) {
+      return errorResponse('セッションの読み込みに失敗しました', 500);
+    }
+    sessionHasNonDrink = (nonDrinkCount ?? 0) > 0;
+  }
+
   // ---- 注文を作成 ----
   const { data: order, error: orderError } = await admin
     .from('orders')
@@ -176,20 +219,36 @@ Deno.serve(async (req: Request) => {
 
   // 商品名と単価はデータベースの値をコピーする(クライアントの申告値は使わない)。
   // 提供タイミングも、その商品が選択を許していなければ「食中」に矯正する。
-  // unit_price には選んだオプションの追加料金を合算して入れる。こうすることで
-  // 伝票合計や売上集計は order_items.unit_price × quantity のままで済み、
-  // オプションの有無を意識せずに正しい金額を扱える。
+  // unit_price には選んだオプションの追加料金を合算し、セット割引が
+  // 適用できるドリンクなら割引額を差し引く。こうすることで伝票合計や
+  // 売上集計は order_items.unit_price × quantity のままで済む。
+  const discounts: ({ name: string; amount: number } | null)[] = [];
   const rows = lines.map((line) => {
     const item = menuById.get(line.menu_item_id)!;
     const options = line.option_ids.map((id) => optionById.get(id)!);
     const optionsTotal = options.reduce((sum, o) => sum + o.extra_price, 0);
+
+    const discountEligible =
+      isDrinkItem(item) &&
+      sessionHasNonDrink &&
+      item.combo_discount_amount > 0 &&
+      !!item.combo_discount_name;
+    // 割引額が価格を上回っても単価が負にならないようにする
+    const discountAmount = discountEligible
+      ? Math.min(item.combo_discount_amount, item.price)
+      : 0;
+    discounts.push(
+      discountEligible ? { name: item.combo_discount_name!, amount: discountAmount } : null,
+    );
+
     return {
       order_id: order.id,
       menu_item_id: item.id,
       item_name: item.name,
-      unit_price: item.price + optionsTotal,
+      unit_price: item.price - discountAmount + optionsTotal,
       quantity: line.quantity,
       serve_timing: item.allows_timing_choice ? line.serve_timing : 'during',
+      category_is_drink: isDrinkItem(item),
     };
   });
 
@@ -204,17 +263,27 @@ Deno.serve(async (req: Request) => {
     return errorResponse('注文の登録に失敗しました', 500);
   }
 
-  // 選択されたオプションを、対応する注文明細に紐づけて記録する(表示用)
-  const optionRows = lines.flatMap((line, index) =>
-    line.option_ids.map((id) => {
+  // 選択されたオプションと、適用されたセット割引を、対応する注文明細に
+  // 紐づけて記録する(表示用。割引は extra_price を負の値にして表す)
+  const optionRows = lines.flatMap((line, index) => {
+    const entries = line.option_ids.map((id) => {
       const option = optionById.get(id)!;
       return {
         order_item_id: insertedItems[index].id,
         option_name: option.name,
         extra_price: option.extra_price,
       };
-    }),
-  );
+    });
+    const discount = discounts[index];
+    if (discount) {
+      entries.push({
+        order_item_id: insertedItems[index].id,
+        option_name: discount.name,
+        extra_price: -discount.amount,
+      });
+    }
+    return entries;
+  });
 
   if (optionRows.length > 0) {
     const { error: optionInsertError } = await admin

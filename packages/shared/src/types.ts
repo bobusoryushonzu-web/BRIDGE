@@ -43,6 +43,8 @@ export interface TableRow {
 export interface Category {
   id: string;
   name: string;
+  /** ドリンクカテゴリか。true の場合のみ商品ごとにセット割引を設定できる */
+  is_drink: boolean;
   sort_order: number;
   is_deleted: boolean;
   created_at: string;
@@ -56,6 +58,10 @@ export interface MenuItem {
   description: string;
   /** 客が「食中/食後」を選べる商品か。商品ごとに店員が設定する */
   allows_timing_choice: boolean;
+  /** セット割引の名称(例: 'セット割引')。未設定なら null */
+  combo_discount_name: string | null;
+  /** セット割引の金額(円、1点あたり)。0なら割引なし */
+  combo_discount_amount: number;
   /** 品切れでないか */
   is_available: boolean;
   /** 論理削除フラグ */
